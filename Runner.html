@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Neon Runner — Single Page</title>
+<style>
+    /* All your original CSS — unchanged */
+    :root {
+        --bg: #0b0b0b;
+        --neon-red: #ff2b2b;
+        --neon-red-glow: 0 0 8px rgba(255, 43, 43, 0.9), 0 0 24px rgba(255, 43, 43, 0.45);
+        --muted: #111;
+        --glass: rgba(255, 255, 255, 0.03);
+        --font: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    html,body {height:100%;margin:0;background:linear-gradient(180deg,#050506 0%,#071013 60%);font-family:var(--font);color:#fff;}
+    .app {min-height:100vh;display:flex;flex-direction:column;}
+    header.nav {display:flex;align-items:center;justify-content:space-between;padding:14px 20px;background:linear-gradient(90deg,rgba(255, 43, 43, 0.04),rgba(0,0,0,0));border-bottom:1px solid rgba(255,43,43,0.03);position:sticky;top:0;z-index:40;}
+    .brand {display:flex;gap:12px;align-items:center}
+    .logo {width:46px;height:46px;border-radius:8px;background:linear-gradient(135deg,var(--neon-red),#9a0000);box-shadow:var(--neon-red-glow);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:20px;color:#111;}
+    .brand h1 {font-size:18px;margin:0;letter-spacing:0.6px;text-shadow:0 0 6px rgba(255,43,43,0.4);}
+    nav.controls {display:flex;gap:10px;align-items:center;}
+    .btn {background:transparent;border:1px solid rgba(255,43,43,0.15);padding:8px 12px;border-radius:8px;color:var(--neon-red);cursor:pointer;font-weight:600;backdrop-filter:blur(4px);}
+    .btn.primary {background:linear-gradient(90deg,rgba(255,43,43,0.16),rgba(255,43,43,0.06));box-shadow:var(--neon-red-glow);color:#fff;border-color:transparent;}
+    main.container {display:flex;flex:1;padding:18px;gap:20px;align-items:center;justify-content:center;}
+    section.view {width:100%;max-width:1000px;border-radius:12px;padding:18px;display:none;position:relative;}
+    section.view.active {display:block;}
+    .home {background:linear-gradient(180deg,rgba(255,43,43,0.03),rgba(255,43,43,0.01));border:1px solid rgba(255,43,43,0.04);text-align:center;padding:60px 20px;}
+    .home .title {font-size:32px;margin:18px 0 8px;text-shadow:var(--neon-red-glow);color:var(--neon-red)}
+    .home p {color:#ddd;margin:8px 0 18px}
+    .game {background:black;border-radius:12px;overflow:hidden;border:1px solid rgba(255,43,43,0.03);display:flex;flex-direction:column;height:70vh;min-height:380px;max-height:700px;}
+    .hud {display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid rgba(255,43,43,0.02);background:linear-gradient(180deg,rgba(255,43,43,0.02),transparent);}
+    .hud .score {font-weight:700;font-size:18px;color:var(--neon-red);text-shadow:var(--neon-red-glow);}
+    .hud .info {font-size:13px;color:#aaa}
+    .play-area {position:relative;flex:1;min-height:300px;background:transparent;display:flex;align-items:flex-end;justify-content:flex-start;}
+    canvas#gameCanvas {width:100%;height:100%;display:block;background:black;}
+    .controls-hint {position:absolute;left:50%;transform:translateX(-50%);bottom:16px;background:var(--glass);padding:8px 12px;border-radius:10px;font-size:13px;color:#ddd;border:1px solid rgba(255,43,43,0.04);}
+    .gameover {text-align:center;padding:40px 20px;background:linear-gradient(180deg,rgba(255,43,43,0.02),rgba(255,43,43,0.01));border-radius:12px;}
+    .gameover h2 {font-size:28px;color:var(--neon-red);text-shadow:var(--neon-red-glow);}
+    .score-big {font-size:44px;font-weight:900;color:#fff;text-shadow:0 0 12px rgba(255,43,43,0.6);}
+</style>
+</head>
+<body>
+<div class="app">
+<header class="nav">
+    <div class="brand">
+        <div class="logo">NR</div>
+        <div>
+            <h1>Neon Runner</h1>
+            <div style="font-size:12px;color:#bbb">Single-page • Neon red theme</div>
+        </div>
+    </div>
+    <nav class="controls">
+        <button id="nav-home" class="btn">Home</button>
+        <button id="nav-start" class="btn primary">Start</button>
+    </nav>
+</header>
+
+<main class="container">
+    <section id="view-home" class="view home active">
+        <h2 class="title">Neon Runner</h2>
+        <p>Run through the neon city — jump over obstacles and survive as long as you can. Controls: <b>Space</b> or <b>Tap</b>.</p>
+        <button id="startBtn" class="btn primary">Start Game</button>
+    </section>
+
+    <section id="view-game" class="view game" aria-hidden="true">
+        <div class="hud">
+            <div class="score" id="scoreDisplay">Score: 0</div>
+            <div class="info" id="speedDisplay">Speed: 1.0x</div>
+        </div>
+        <div class="play-area" id="playArea">
+            <div class="skyline" id="skyline"></div>
+            <canvas id="gameCanvas" width="1200" height="600"></canvas>
+            <div class="controls-hint" id="controlsHint">Space or Tap to Jump · Swipe up to jump</div>
+        </div>
+    </section>
+
+    <section id="view-gameover" class="view gameover" aria-hidden="true">
+        <h2>Game Over</h2>
+        <div class="score-big" id="finalScore">0</div>
+        <div style="display:flex;gap:12px;justify-content:center">
+            <button id="replayBtn" class="btn primary">Play Again</button>
+            <button id="homeBtn" class="btn">Home</button>
+        </div>
+    </section>
+</main>
+</div>
+
+<script>
+(() => {
+    const viewHome = document.getElementById('view-home');
+    const viewGame = document.getElementById('view-game');
+    const viewGameOver = document.getElementById('view-gameover');
+    const startBtn = document.getElementById('startBtn');
+    const navStart = document.getElementById('nav-start');
+    const navHome = document.getElementById('nav-home');
+    const replayBtn = document.getElementById('replayBtn');
+    const homeBtn = document.getElementById('homeBtn');
+    const scoreDisplay = document.getElementById('scoreDisplay');
+    const speedDisplay = document.getElementById('speedDisplay');
+    const finalScore = document.getElementById('finalScore');
+    const skyline = document.getElementById('skyline');
+    const controlsHint = document.getElementById('controlsHint');
+
+    function showView(view) {
+        [viewHome, viewGame, viewGameOver].forEach(v => v.classList.remove('active'));
+        view.classList.add('active');
+        viewHome.setAttribute('aria-hidden', view !== viewHome);
+        viewGame.setAttribute('aria-hidden', view !== viewGame);
+        viewGameOver.setAttribute('aria-hidden', view !== viewGameOver);
+    }
+
+    navStart.addEventListener('click', startGame);
+    startBtn.addEventListener('click', startGame);
+    replayBtn.addEventListener('click', startGame);
+    homeBtn.addEventListener('click', () => { running=false; showView(viewHome); });
+    navHome.addEventListener('click', () => { running=false; showView(viewHome); });
+
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    function resizeCanvasToDisplay() {
+        const rect = canvas.getBoundingClientRect();
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        canvas.width = Math.floor(rect.width * dpr);
+        canvas.height = Math.floor(rect.height * dpr);
+        ctx.setTransform(1,0,0,1,0,0);
+        ctx.scale(dpr,dpr);
+    }
+
+    function updateSkyline() {
+        const w = canvas.width;
+        skyline.style.height = Math.max(80, Math.round(canvas.height * 0.22)) + 'px';
+    }
+
+    let running=false,lastTime=0,score=0,speedMultiplier=1,elapsedSinceStart=0;
+    const gravity=0.7,friction=0.98;
+    let groundY=0;
+    const player={x:80,y:0,width:48,height:56,vy:0,grounded:false,color:'#ff4d4d',jumpStrength:-12};
+    const obstaclePool=[],activeObstacles=[];
+    const OB_POOL_SIZE=8;
+    let spawnTimer=0,spawnInterval=1400,spawnIntervalMin=650,spawnDecreaseRate=0.6,speedIncreaseEvery=5000,speedIncreaseTimer=0;
+    let allowJump=true,isJumpKeyDown=false;
+
+    function initPool(){obstaclePool.length=0;for(let i=0;i<OB_POOL_SIZE;i++){obstaclePool.push({x:0,y:0,width:36,height:48,vx:-6,active:false,color:'#ff2b2b'});}}
+
+    function spawnObstacle(){
+        if(!obstaclePool.length) return;
+        const ob=obstaclePool.pop();
+        ob.x=canvas.width/ (window.devicePixelRatio||1) + 30 + Math.random()*80;
+        ob.width=28+Math.round(Math.random()*36);
+        ob.height=28+Math.round(Math.random()*44);
+        ob.y=groundY-ob.height;
+        ob.vx=-6*speedMultiplier;
+        ob.active=true;
+        activeObstacles.push(ob);
+    }
+
+    function recycleObstacle(i){
+        const ob=activeObstacles[i];
+        ob.active=false;
+        obstaclePool.push(ob);
+        activeObstacles.splice(i,1);
+    }
+
+    function resetGame(){
+        score=0;speedMultiplier=1;elapsedSinceStart=0;
+        spawnTimer=600;speedIncreaseTimer=0;
+        player.vy=0;player.grounded=true;
+        activeObstacles.length=0;initPool();
+        updateHUD();
+    }
+
+    function startGame(){
+        resetGame();
+        showView(viewGame);
+        resizeCanvasToDisplay();
+        groundY = canvas.height/(window.devicePixelRatio||1) - Math.round((canvas.height/(window.devicePixelRatio||1))*0.12);
+        player.y=groundY-player.height;
+        running=true;
+        lastTime=performance.now();
+        requestAnimationFrame(loop);
+    }
+
+    function update(dt){
+        speedIncreaseTimer+=dt;
+        if(speedIncreaseTimer>=speedIncreaseEvery){speedMultiplier=Math.min(3.2,speedMultiplier+0.12);speedIncreaseTimer=0;}
+        spawnTimer-=dt;
+        const dynamicInterval=Math.max(spawnIntervalMin,spawnInterval*Math.pow(spawnDecreaseRate,speedMultiplier-1));
+        if(spawnTimer<=0){spawnObstacle();spawnTimer=dynamicInterval+Math.random()*400;}
+        player.vy+=gravity*(dt/16);
+        player.vy*=friction;
+        player.y+=player.vy*(dt/16);
+        if(player.y>=groundY-player.height){player.y=groundY-player.height;player.vy=0;player.grounded=true;allowJump=true;}else{player.grounded=false;}
+        for(let i=activeObstacles.length-1;i>=0;i--){
+            const ob=activeObstacles[i];
+            ob.x+=ob.vx*(dt/16)*(1+(speedMultiplier-1)*0.35);
+            if(ob.x+ob.width<-60){recycleObstacle(i);continue;}
+            if(rectIntersect(player.x,player.y,player.width,player.height,ob.x,ob.y,ob.width,ob.height)){gameOver();return;}
+        }
+        score=Math.floor(elapsedSinceStart/10);
+        updateHUD();
+    }
+
+    function draw(){
+        ctx.clearRect(0,0,canvas.width,canvas.height);
+        ctx.save();
+        ctx.strokeStyle='rgba(255,43,43,0.7)';
+        ctx.shadowColor='rgba(255,43,43,0.9)';
+        ctx.shadowBlur=14;
+        ctx.lineWidth=3;
+        ctx.beginPath();
+        ctx.moveTo(0,groundY);
+        ctx.lineTo(canvas.width,groundY);
+        ctx.stroke();
+        ctx.restore();
+        drawNeonRect(player.x,player.y,player.width,player.height,player.color);
+        for(let ob of activeObstacles){drawNeonRect(ob.x,ob.y,ob.width,ob.height,ob.color);}
+    }
+
+    function loop(now){
+        if(!running) return;
+        const dt=Math.min(40,now-lastTime);
+        lastTime=now;
+        elapsedSinceStart+=dt;
+        update(dt);
+        draw();
+        requestAnimationFrame(loop);
+    }
+
+    function drawNeonRect(x,y,w,h,color){
+        ctx.save();
+        ctx.shadowColor=color;
+        ctx.shadowBlur=28;
+        ctx.fillStyle=color;
+        ctx.fillRect(x,y,w,h);
+        ctx.restore();
+    }
+
+    function rectIntersect(ax,ay,aw,ah,bx,by,bw,bh){
+        return ax<bx+bw && ax+aw>bx && ay<by+bh && ay+ah>by;
+    }
+
+    function triggerJump(){
+        if(!allowJump||!running||!player.grounded)return;
+        player.vy=player.jumpStrength;
+        player.grounded=false;
+        allowJump=false;
+    }
+
+    function updateHUD(){
+        scoreDisplay.textContent='Score: '+score;
+        speedDisplay.textContent='Speed: '+speedMultiplier.toFixed(2)+'x';
+    }
+
+    window.addEventListener('keydown',(e)=>{if(e.code==='Space'){if(isJumpKeyDown)return;isJumpKeyDown=true;triggerJump();e.preventDefault();}});
+    window.addEventListener('keyup',(e)=>{if(e.code==='Space'){isJumpKeyDown=false;}});
+    canvas.addEventListener('pointerdown',()=>{if(running)triggerJump();});
+    window.addEventListener('resize',()=>{resizeCanvasToDisplay();groundY = canvas.height/(window.devicePixelRatio||1) - Math.round((canvas.height/(window.devicePixelRatio||1))*0.12);});
+
+    initPool();
+    resizeCanvasToDisplay();
+})();
+</script>
+</body>
+</html>
